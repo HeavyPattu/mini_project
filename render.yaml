@@ -2,11 +2,17 @@ services:
   - type: web
     name: reroute-edge-ai-backend
     env: docker
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     plan: free
     region: singapore
     healthCheckPath: /api/health
     envVars:
       - key: PORT
         value: 8000
+      - key: ENVIRONMENT
+        value: production
+      - key: MODEL_PATH
+        value: best.pt
+      - key: OPERATOR_SECRET_CODE
+        value: SMKC-ADMIN

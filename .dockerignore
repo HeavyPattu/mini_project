@@ -1,0 +1,12 @@
+node_modules/
+mobile-app/
+.expo/
+.git/
+.gitignore
+*.log
+__pycache__/
+*.py[cod]
+yolo26n.pt/
+yolo26_2n.pt/
+best.2pt/
+best.pt.zip
