@@ -44,7 +44,15 @@ export const setApiBaseUrl = (newUrl) => {
   if (!newUrl) return;
   let formattedUrl = newUrl.trim();
   if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
-    formattedUrl = `http://${formattedUrl}`;
+    if (formattedUrl.includes('.onrender.com') || formattedUrl.includes('.railway.app') || !formattedUrl.match(/^\d+\.\d+\.\d+\.\d+/)) {
+      formattedUrl = `https://${formattedUrl}`;
+    } else {
+      formattedUrl = `http://${formattedUrl}`;
+    }
+  }
+  // If user pasted http:// for onrender.com, upgrade to https://
+  if (formattedUrl.startsWith('http://') && formattedUrl.includes('.onrender.com')) {
+    formattedUrl = formattedUrl.replace('http://', 'https://');
   }
   // Strip trailing slash
   if (formattedUrl.endsWith('/')) {
