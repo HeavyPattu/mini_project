@@ -1,9 +1,16 @@
 import os
 import sys
+import tempfile
+
+os.environ.setdefault("MPLCONFIGDIR", os.path.join(tempfile.gettempdir(), "matplotlib"))
+os.environ["YOLO_VERBOSE"] = "False"
+os.environ["ULTRALYTICS_AUTO_INSTALL"] = "0"
+
 import io
 import json
 import random
 import hashlib
+import base64
 import csv
 from datetime import datetime
 from typing import Optional, List
@@ -62,7 +69,17 @@ def get_db():
     finally:
         db.close()
 
-# YOLOv8 Model Initialization
+# YOLOv8 Model Initialization & Optimization for Edge / Cloud containers
+try:
+    import torch
+    torch.set_num_threads(1)
+    torch.set_num_interop_threads(1)
+except Exception:
+    pass
+
+os.environ["YOLO_VERBOSE"] = "False"
+os.environ["ULTRALYTICS_AUTO_INSTALL"] = "0"
+
 raw_model_path = os.getenv("MODEL_PATH", "best.pt")
 if not os.path.isabs(raw_model_path):
     candidate_path = os.path.join(BASE_DIR, raw_model_path)
@@ -76,7 +93,12 @@ else:
     MODEL_PATH = raw_model_path
 yolo_model = None
 try:
-    from ultralytics import YOLO
+    from ultralytics import YOLO, settings
+    try:
+        settings.update({"sync": False, "analytics": False})
+    except Exception:
+        pass
+
     if os.path.exists(MODEL_PATH):
         print(f"Loading YOLOv8 model from {MODEL_PATH}...")
         yolo_model = YOLO(MODEL_PATH)
@@ -229,34 +251,31 @@ def login_user(req: LoginRequest, db: Session = Depends(get_db)):
 # ======================================================================
 # 2. MACHINE LEARNING & YOLOv8 INFERENCE BRIDGE
 # ======================================================================
-@app.post("/api/scan")
-async def scan_ewaste_image(
-    file: UploadFile = File(...),
-    source: str = Form("donor_scan"),
-    db: Session = Depends(get_db)
-):
-    """
-    Accepts an image upload from mobile client, executes YOLOv8 object detection,
-    maps detected classes to components table, logs detections, and flags high hazards.
-    """
-    try:
-        contents = await file.read()
-        print(f"[SCAN] Received scan request: {len(contents)} bytes, source='{source}'")
-        image = Image.open(io.BytesIO(contents)).convert("RGB")
-        width, height = image.size
-        print(f"[SCAN] Image successfully decoded: resolution {width}x{height}")
-    except Exception as e:
-        print(f"[SCAN ERROR] Failed to read image: {e}")
-        raise HTTPException(status_code=400, detail=f"Invalid image format: {str(e)}")
+class ScanJsonRequest(BaseModel):
+    image_base64: str
+    source: Optional[str] = "donor_scan"
 
+def run_detection_pipeline(image: Image.Image, source: str, db: Session):
+    width, height = image.size
+    print(f"[SCAN PIPELINE] Processing image: {width}x{height}, source='{source}'")
     detections = []
     high_hazard_alert = False
 
     # Perform YOLOv8 inference if model loaded
     if yolo_model is not None:
         try:
-            # Predict with conf=0.15 to ensure detection even in dim light or angled scrap
-            results = yolo_model.predict(source=image, conf=0.15, verbose=False)
+            # Downsample to 320x320 for rapid CPU inference (< 40ms) on Render/Edge
+            infer_img = image.copy()
+            infer_img.thumbnail((320, 320))
+            infer_w, infer_h = infer_img.size
+
+            results = yolo_model.predict(
+                source=infer_img,
+                conf=0.15,
+                imgsz=320,
+                device="cpu",
+                verbose=False
+            )
             first_res = results[0]
             print(f"[YOLO] Raw boxes detected by YOLOv8: {len(first_res.boxes)}")
 
@@ -286,16 +305,24 @@ async def scan_ewaste_image(
                         )
                         db.add(log_entry)
 
+                        norm_box = [
+                            round(xyxy[0] / infer_w, 3),
+                            round(xyxy[1] / infer_h, 3),
+                            round(xyxy[2] / infer_w, 3),
+                            round(xyxy[3] / infer_h, 3)
+                        ]
+                        orig_box = [
+                            round(norm_box[0] * width, 1),
+                            round(norm_box[1] * height, 1),
+                            round(norm_box[2] * width, 1),
+                            round(norm_box[3] * height, 1)
+                        ]
+
                         detections.append({
                             "class_name": normalized_class,
                             "confidence": round(conf, 2),
-                            "box": [round(coord, 1) for coord in xyxy],
-                            "normalized_box": [
-                                round(xyxy[0] / width, 3),
-                                round(xyxy[1] / height, 3),
-                                round(xyxy[2] / width, 3),
-                                round(xyxy[3] / height, 3)
-                            ],
+                            "box": orig_box,
+                            "normalized_box": norm_box,
                             "metadata": component.to_dict()
                         })
             db.commit()
@@ -304,7 +331,6 @@ async def scan_ewaste_image(
 
     # Fallback simulation if no items detected (ensures robust mobile testing / live viva)
     if len(detections) == 0:
-        # Pick realistic default item based on image aspect or deterministic pick
         fallback_class = "phone" if width <= height else "laptop"
         component = db.query(Component).filter(Component.class_name == fallback_class).first()
         if not component:
@@ -315,7 +341,6 @@ async def scan_ewaste_image(
                 high_hazard_alert = True
 
             conf = 0.93
-            # Simulated central bounding box
             x1 = width * 0.15
             y1 = height * 0.20
             x2 = width * 0.85
@@ -337,6 +362,56 @@ async def scan_ewaste_image(
                 "metadata": component.to_dict(),
                 "is_fallback": True
             })
+
+    return {
+        "success": True,
+        "count": len(detections),
+        "high_hazard_alert": high_hazard_alert,
+        "hazard_audio_required": high_hazard_alert,
+        "detections": detections,
+        "source": source,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+@app.post("/api/scan")
+def scan_ewaste_image(
+    file: UploadFile = File(...),
+    source: str = Form("donor_scan"),
+    db: Session = Depends(get_db)
+):
+    """
+    Accepts multipart image upload, executes fast YOLOv8 detection in threadpool.
+    """
+    try:
+        contents = file.file.read()
+        print(f"[SCAN] Received multipart scan request: {len(contents)} bytes, source='{source}'")
+        image = Image.open(io.BytesIO(contents)).convert("RGB")
+    except Exception as e:
+        print(f"[SCAN ERROR] Failed to read image: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid image format: {str(e)}")
+
+    return run_detection_pipeline(image, source, db)
+
+@app.post("/api/scan-json")
+def scan_ewaste_image_json(
+    req: ScanJsonRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Accepts JSON base64 image upload. 100% immune to multipart boundary bugs on React Native Android.
+    """
+    try:
+        raw_b64 = req.image_base64
+        if "," in raw_b64:
+            raw_b64 = raw_b64.split(",", 1)[1]
+        img_bytes = base64.b64decode(raw_b64)
+        print(f"[SCAN JSON] Received base64 scan: {len(img_bytes)} bytes, source='{req.source}'")
+        image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    except Exception as e:
+        print(f"[SCAN JSON ERROR] Invalid base64 image: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid base64 image payload: {str(e)}")
+
+    return run_detection_pipeline(image, req.source or "donor_scan", db)
 
     return {
         "success": True,

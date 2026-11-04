@@ -79,11 +79,12 @@ export default function DonorHomeScreen({ currentUser }) {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.6,
+        quality: 0.5,
+        base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets[0].uri) {
-        processScan(result.assets[0].uri);
+        processScan(result.assets[0].uri, result.assets[0].base64);
       }
     } catch (error) {
       Alert.alert('Gallery Error', error.message);
@@ -101,25 +102,26 @@ export default function DonorHomeScreen({ currentUser }) {
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.6,
+        quality: 0.5,
+        base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets[0].uri) {
-        processScan(result.assets[0].uri);
+        processScan(result.assets[0].uri, result.assets[0].base64);
       }
     } catch (error) {
       Alert.alert('Camera Error', error.message);
     }
   };
 
-  const processScan = async (uri) => {
+  const processScan = async (uri, base64Data = null) => {
     setSelectedImage(uri);
     setScanning(true);
     setScanResult(null);
     setActiveHazardAlert(false);
 
     try {
-      const response = await scanImage(uri, 'donor_scan');
+      const response = await scanImage(uri, 'donor_scan', base64Data);
       setScanResult(response);
 
       if (response.high_hazard_alert) {

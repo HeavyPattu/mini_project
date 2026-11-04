@@ -64,12 +64,13 @@ export default function OperatorDashboardScreen({ currentUser }) {
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        quality: 0.7,
+        quality: 0.5,
         allowsEditing: false,
+        base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets[0].uri) {
-        processIntakeScan(result.assets[0].uri);
+        processIntakeScan(result.assets[0].uri, result.assets[0].base64);
       }
     } catch (err) {
       Alert.alert('Camera Error', err.message);
@@ -80,25 +81,26 @@ export default function OperatorDashboardScreen({ currentUser }) {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.7,
+        quality: 0.5,
+        base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets[0].uri) {
-        processIntakeScan(result.assets[0].uri);
+        processIntakeScan(result.assets[0].uri, result.assets[0].base64);
       }
     } catch (err) {
       Alert.alert('Gallery Error', err.message);
     }
   };
 
-  const processIntakeScan = async (uri) => {
+  const processIntakeScan = async (uri, base64Data = null) => {
     setSelectedImage(uri);
     setScanning(true);
     setActiveItem(null);
     setHazardAlertActive(false);
 
     try {
-      const res = await scanImage(uri, 'drive_intake');
+      const res = await scanImage(uri, 'drive_intake', base64Data);
       if (res.detections && res.detections.length > 0) {
         const topDetection = res.detections[0];
         setActiveItem(topDetection);

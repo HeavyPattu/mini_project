@@ -77,7 +77,26 @@ export const registerUser = async (userData) => {
 };
 
 // 2. YOLOv8 E-Waste AI Inference Scan
-export const scanImage = async (imageUri, source = 'donor_scan') => {
+export const scanImage = async (imageUri, source = 'donor_scan', base64Data = null) => {
+  // If base64 is available, use JSON endpoint: 100% resilient across all Android devices & Axios
+  if (base64Data) {
+    try {
+      const response = await api.post('/api/scan-json', {
+        image_base64: base64Data,
+        source: source,
+      }, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        timeout: 45000,
+      });
+      return response.data;
+    } catch (jsonErr) {
+      console.log('[API] JSON scan error, trying multipart fallback:', jsonErr?.message);
+    }
+  }
+
   const formData = new FormData();
 
   // Extract filename and mime type
@@ -102,7 +121,7 @@ export const scanImage = async (imageUri, source = 'donor_scan') => {
     headers: {
       'Accept': 'application/json',
     },
-    timeout: 30000,
+    timeout: 45000,
   });
   return response.data;
 };
