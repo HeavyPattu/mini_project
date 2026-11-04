@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "ReRoute E-Waste AI",
+    "slug": "reroute-ewaste",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0F172A"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0F172A"
+      },
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "ReRoute AI requires camera access to detect and classify e-waste items and identify lithium-ion battery hazards."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "ReRoute AI requires access to your photo library to select e-waste images for classification."
+        }
+      ]
+    ]
+  }
+}
