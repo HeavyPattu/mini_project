@@ -79,7 +79,7 @@ export default function DonorHomeScreen({ currentUser }) {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.8,
+        quality: 0.6,
       });
 
       if (!result.canceled && result.assets && result.assets[0].uri) {
@@ -101,7 +101,7 @@ export default function DonorHomeScreen({ currentUser }) {
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.8,
+        quality: 0.6,
       });
 
       if (!result.canceled && result.assets && result.assets[0].uri) {

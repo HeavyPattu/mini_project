@@ -97,12 +97,17 @@ LABEL_MAPPING = {
     "smartphone": "phone",
     "laptop": "laptop",
     "computer": "laptop",
+    "tv": "laptop",
+    "monitor": "laptop",
+    "screen": "laptop",
     "keyboard": "keyboard",
     "mouse": "mouse",
     "remote": "pd",
     "usb": "pd",
     "flash drive": "pd",
     "pd": "pd",
+    "pen drive": "pd",
+    "pendrive": "pd",
     "earbud": "earbud",
     "earbuds": "earbud",
     "headphones": "earbud",
@@ -236,9 +241,12 @@ async def scan_ewaste_image(
     """
     try:
         contents = await file.read()
+        print(f"[SCAN] Received scan request: {len(contents)} bytes, source='{source}'")
         image = Image.open(io.BytesIO(contents)).convert("RGB")
         width, height = image.size
+        print(f"[SCAN] Image successfully decoded: resolution {width}x{height}")
     except Exception as e:
+        print(f"[SCAN ERROR] Failed to read image: {e}")
         raise HTTPException(status_code=400, detail=f"Invalid image format: {str(e)}")
 
     detections = []
@@ -247,14 +255,17 @@ async def scan_ewaste_image(
     # Perform YOLOv8 inference if model loaded
     if yolo_model is not None:
         try:
-            results = yolo_model.predict(source=image, conf=0.20, verbose=False)
+            # Predict with conf=0.15 to ensure detection even in dim light or angled scrap
+            results = yolo_model.predict(source=image, conf=0.15, verbose=False)
             first_res = results[0]
+            print(f"[YOLO] Raw boxes detected by YOLOv8: {len(first_res.boxes)}")
 
             for box in first_res.boxes:
                 cls_id = int(box.cls[0].item())
                 raw_name = first_res.names.get(cls_id, "unknown").lower()
                 conf = float(box.conf[0].item())
                 xyxy = box.xyxy[0].tolist()
+                print(f"[YOLO BOX] cls_id={cls_id}, label='{raw_name}', conf={conf:.2f}")
 
                 # Normalize to one of our core classes if match exists
                 normalized_class = LABEL_MAPPING.get(raw_name)

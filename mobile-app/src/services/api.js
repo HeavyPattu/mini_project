@@ -75,19 +75,26 @@ export const scanImage = async (imageUri, source = 'donor_scan') => {
   // Extract filename and mime type
   const filename = imageUri.split('/').pop() || 'scan_frame.jpg';
   const match = /\.(\w+)$/.exec(filename);
-  const type = match ? `image/${match[1].toLowerCase()}` : 'image/jpeg';
+  const ext = match ? match[1].toLowerCase() : 'jpg';
+  const type = ext === 'png' ? 'image/png' : 'image/jpeg';
+
+  // Format URI properly for Android/iOS
+  const cleanUri = Platform.OS === 'android' ? imageUri : imageUri.replace('file://', '');
 
   formData.append('file', {
-    uri: imageUri,
+    uri: cleanUri,
     name: filename,
     type: type,
   });
   formData.append('source', source);
 
+  // NOTE: In React Native Axios, do NOT pass manual Content-Type: multipart/form-data.
+  // React Native automatically generates the multipart boundary.
   const response = await api.post('/api/scan', formData, {
     headers: {
-      'Content-Type': 'multipart/form-data',
+      'Accept': 'application/json',
     },
+    timeout: 30000,
   });
   return response.data;
 };
