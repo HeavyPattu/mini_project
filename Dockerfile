@@ -16,7 +16,6 @@ WORKDIR /app
 # Install dependencies (CPU PyTorch keeps Docker image compact and fast)
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
     pip install --no-cache-dir -r requirements.txt
 
 # Copy backend application files
