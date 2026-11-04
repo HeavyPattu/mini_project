@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  Vibration,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -36,9 +37,12 @@ export default function OperatorDashboardScreen({ currentUser }) {
     { id: 3, item: 'Samsung Galaxy A50', bin: 'Hazardous_Battery_Depot', hazard: 'High', time: '10:50 AM' },
   ]);
 
-  // High hazard audio alarm
+  // High hazard audio alarm & haptic vibration
   const triggerHazardAudio = async () => {
     try {
+      // Haptic alert pattern for drive triage
+      Vibration.vibrate([0, 400, 150, 400]);
+
       if (AudioModule && AudioModule.Sound) {
         const { sound } = await AudioModule.Sound.createAsync(
           { uri: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg' },
@@ -47,7 +51,7 @@ export default function OperatorDashboardScreen({ currentUser }) {
         await sound.playAsync();
       }
     } catch (e) {
-      console.log('Audio alarm:', e.message);
+      console.log('Audio/Haptic alarm notice:', e.message);
     }
   };
 

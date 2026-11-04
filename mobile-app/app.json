@@ -4,6 +4,7 @@
     "slug": "reroute-ewaste",
     "version": "1.0.0",
     "orientation": "portrait",
+    "newArchEnabled": false,
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "splash": {
@@ -20,9 +21,11 @@
         "backgroundColor": "#0F172A"
       },
       "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "plugins": [
@@ -38,6 +41,11 @@
           "photosPermission": "ReRoute AI requires access to your photo library to select e-waste images for classification."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b5fb7fa8-f7fc-4b2f-8138-fa467b3b9da0"
+      }
+    }
   }
 }

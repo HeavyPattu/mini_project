@@ -6,8 +6,8 @@ import {
   StyleSheet,
   StatusBar,
   Platform,
+  SafeAreaView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AuthScreen from './src/screens/AuthScreen';
 import DonorHomeScreen from './src/screens/DonorHomeScreen';

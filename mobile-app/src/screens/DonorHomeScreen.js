@@ -10,6 +10,7 @@ import {
   Alert,
   Modal,
   TextInput,
+  Vibration,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -48,9 +49,12 @@ export default function DonorHomeScreen({ currentUser }) {
   const [bookingLoading, setBookingLoading] = useState(false);
   const [confirmedTrackingCode, setConfirmedTrackingCode] = useState(null);
 
-  // Play hazard sound effect when high-hazard battery detected
+  // Play hazard sound effect & haptic vibration when high-hazard battery detected
   const playHazardWarningChime = async () => {
     try {
+      // Urgent haptic vibration pattern: 400ms pulse, 150ms pause, 400ms pulse
+      Vibration.vibrate([0, 400, 150, 400]);
+
       if (AudioModule && AudioModule.Sound) {
         const { sound } = await AudioModule.Sound.createAsync(
           { uri: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg' },
@@ -59,7 +63,7 @@ export default function DonorHomeScreen({ currentUser }) {
         await sound.playAsync();
       }
     } catch (e) {
-      console.log('Audio playback notice:', e.message);
+      console.log('Audio/Haptic playback notice:', e.message);
     }
   };
 
