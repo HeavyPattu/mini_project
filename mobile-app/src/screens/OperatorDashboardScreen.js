@@ -8,6 +8,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  Modal,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -17,12 +18,14 @@ try {
 } catch (e) {}
 
 import { scanImage } from '../services/api';
+import { DEVICE_COMPONENT_BREAKDOWNS } from '../services/componentDetails';
 
 export default function OperatorDashboardScreen({ currentUser }) {
   const [selectedImage, setSelectedImage] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [activeItem, setActiveItem] = useState(null);
   const [hazardAlertActive, setHazardAlertActive] = useState(false);
+  const [teardownModalVisible, setTeardownModalVisible] = useState(false);
 
   // Operator shift tallies
   const [shiftCount, setShiftCount] = useState(14);
@@ -148,6 +151,21 @@ export default function OperatorDashboardScreen({ currentUser }) {
     ]);
   };
 
+  const opClassKey = activeItem?.class_name?.toLowerCase();
+  const opFallback = opClassKey ? DEVICE_COMPONENT_BREAKDOWNS[opClassKey] : null;
+  const opSubComponents = activeItem?.metadata?.sub_components?.length
+    ? activeItem.metadata.sub_components
+    : opFallback?.subComponents || [];
+  const opDisassemblySteps = activeItem?.metadata?.disassembly_steps?.length
+    ? activeItem.metadata.disassembly_steps
+    : opFallback?.disassemblySteps || [];
+  const opRecyclingProtocols = activeItem?.metadata?.recycling_protocols?.length
+    ? activeItem.metadata.recycling_protocols
+    : opFallback?.recyclingProtocols || [];
+  const opEnvironmentalAlert = activeItem?.metadata?.environmental_alert
+    || opFallback?.environmentalAlert
+    || '';
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Operator Shift Header */}
@@ -255,6 +273,15 @@ export default function OperatorDashboardScreen({ currentUser }) {
                 {activeItem.metadata.handling_instructions}
               </Text>
             </View>
+
+            <TouchableOpacity
+              style={styles.teardownGuideBtn}
+              onPress={() => setTeardownModalVisible(true)}
+            >
+              <Text style={styles.teardownGuideBtnText}>
+                🔍 View Internal Components & Safe Teardown Manual →
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
       </View>
@@ -345,6 +372,90 @@ export default function OperatorDashboardScreen({ currentUser }) {
           </View>
         ))}
       </View>
+
+      {/* Operator Teardown & Component Breakdown Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={teardownModalVisible}
+        onRequestClose={() => setTeardownModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.modalHeader}>
+                <View>
+                  <Text style={styles.modalTitle}>
+                    {activeItem?.class_name.toUpperCase()} INTERNAL TEARDOWN GUIDE
+                  </Text>
+                  <Text style={styles.modalSub}>{activeItem?.metadata?.category}</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.closeBtn}
+                  onPress={() => setTeardownModalVisible(false)}
+                >
+                  <Text style={styles.closeBtnText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Sub-components list */}
+              {opSubComponents.map((sub, idx) => (
+                <View key={sub.id || idx} style={styles.opCompCard}>
+                  {sub.imageUrl ? (
+                    <View style={styles.opCompImageWrapper}>
+                      <Image
+                        source={{ uri: sub.imageUrl }}
+                        style={styles.opCompImage}
+                        resizeMode="cover"
+                      />
+                      <View
+                        style={[
+                          styles.opHazardPill,
+                          { backgroundColor: sub.badgeColor || (sub.hazardLevel === 'High' ? '#EF4444' : '#10B981') }
+                        ]}
+                      >
+                        <Text style={styles.opHazardPillText}>{sub.hazardLevel}</Text>
+                      </View>
+                    </View>
+                  ) : null}
+
+                  <View style={styles.opCompBody}>
+                    <Text style={styles.opCompName}>{sub.name}</Text>
+                    <Text style={styles.opCompLocation}>📍 {sub.whereItIs || sub.location}</Text>
+                    <Text style={styles.opCompAppearance}>👀 {sub.appearance}</Text>
+
+                    <View style={styles.opSafetyBox}>
+                      <Text style={styles.opSafetyText}>🛡️ {sub.handlingSafety}</Text>
+                    </View>
+
+                    <View style={styles.opRecycleBox}>
+                      <Text style={styles.opRecycleText}>♻️ {sub.recyclingProcess}</Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+
+              {/* Disassembly steps */}
+              {opDisassemblySteps.length > 0 && (
+                <View style={styles.opStepSection}>
+                  <Text style={styles.opStepTitle}>🛠️ Rapid Disassembly Protocol</Text>
+                  {opDisassemblySteps.map((step, idx) => (
+                    <Text key={idx} style={styles.opStepItem}>{step}</Text>
+                  ))}
+                </View>
+              )}
+
+              {/* Close Button */}
+              <TouchableOpacity
+                style={styles.modalCloseDoneBtn}
+                onPress={() => setTeardownModalVisible(false)}
+              >
+                <Text style={styles.modalCloseDoneBtnText}>Close Teardown Guide</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -702,5 +813,172 @@ const styles = StyleSheet.create({
     color: '#64748B',
     fontSize: 9,
     marginTop: 2,
+  },
+  teardownGuideBtn: {
+    backgroundColor: '#38BDF8',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  teardownGuideBtnText: {
+    color: '#0F172A',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#1E293B',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '85%',
+    padding: 16,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#334155',
+    paddingBottom: 10,
+  },
+  modalTitle: {
+    color: '#F8FAFC',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  modalSub: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  closeBtn: {
+    backgroundColor: '#334155',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeBtnText: {
+    color: '#CBD5E1',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  opCompCard: {
+    backgroundColor: '#0F172A',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#334155',
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  opCompImageWrapper: {
+    width: '100%',
+    height: 120,
+    position: 'relative',
+    backgroundColor: '#1E293B',
+  },
+  opCompImage: {
+    width: '100%',
+    height: '100%',
+  },
+  opHazardPill: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  opHazardPillText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  opCompBody: {
+    padding: 10,
+  },
+  opCompName: {
+    color: '#F8FAFC',
+    fontSize: 13,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  opCompLocation: {
+    color: '#38BDF8',
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  opCompAppearance: {
+    color: '#94A3B8',
+    fontSize: 11,
+    lineHeight: 15,
+    marginBottom: 6,
+  },
+  opSafetyBox: {
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    padding: 6,
+    borderRadius: 4,
+    borderLeftWidth: 2,
+    borderLeftColor: '#EF4444',
+    marginBottom: 4,
+  },
+  opSafetyText: {
+    color: '#FEE2E2',
+    fontSize: 10,
+    lineHeight: 14,
+  },
+  opRecycleBox: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    padding: 6,
+    borderRadius: 4,
+    borderLeftWidth: 2,
+    borderLeftColor: '#10B981',
+  },
+  opRecycleText: {
+    color: '#D1FAE5',
+    fontSize: 10,
+    lineHeight: 14,
+  },
+  opStepSection: {
+    backgroundColor: '#0F172A',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  opStepTitle: {
+    color: '#38BDF8',
+    fontSize: 11,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  opStepItem: {
+    color: '#CBD5E1',
+    fontSize: 11,
+    lineHeight: 16,
+    marginBottom: 4,
+  },
+  modalCloseDoneBtn: {
+    backgroundColor: '#10B981',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginVertical: 10,
+  },
+  modalCloseDoneBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
   },
 });

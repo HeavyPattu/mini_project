@@ -44,10 +44,37 @@ class Component(Base):
     handling_instructions = Column(Text, nullable=False)
     est_weight_kg = Column(Float, default=0.2)
     co2_offset_kg = Column(Float, default=1.5)
+    device_image_url = Column(String(500), nullable=True)
+    sub_components_json = Column(Text, nullable=True)
+    disassembly_steps_json = Column(Text, nullable=True)
+    recycling_protocols_json = Column(Text, nullable=True)
+    environmental_alert = Column(Text, nullable=True)
 
     logs = relationship("DetectionLog", back_populates="component")
 
     def to_dict(self):
+        import json
+        sub_components = []
+        if self.sub_components_json:
+            try:
+                sub_components = json.loads(self.sub_components_json)
+            except Exception:
+                sub_components = []
+
+        disassembly_steps = []
+        if self.disassembly_steps_json:
+            try:
+                disassembly_steps = json.loads(self.disassembly_steps_json)
+            except Exception:
+                disassembly_steps = []
+
+        recycling_protocols = []
+        if self.recycling_protocols_json:
+            try:
+                recycling_protocols = json.loads(self.recycling_protocols_json)
+            except Exception:
+                recycling_protocols = []
+
         return {
             "component_id": self.component_id,
             "class_name": self.class_name,
@@ -59,7 +86,12 @@ class Component(Base):
             "target_bin": self.target_bin,
             "handling_instructions": self.handling_instructions,
             "est_weight_kg": self.est_weight_kg,
-            "co2_offset_kg": self.co2_offset_kg
+            "co2_offset_kg": self.co2_offset_kg,
+            "device_image_url": self.device_image_url,
+            "sub_components": sub_components,
+            "disassembly_steps": disassembly_steps,
+            "recycling_protocols": recycling_protocols,
+            "environmental_alert": self.environmental_alert or ""
         }
 
 

@@ -44,6 +44,9 @@ backend/ewaste_system.db
 
 # Raw Weights Directory (Clean model resides in backend/best.pt)
 yolo26n.pt/
+yolo26_2n.pt/
+best.2pt/
+best.pt.zip
 test_best.pt
 
 # Logs & Temporary Files

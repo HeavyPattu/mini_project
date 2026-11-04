@@ -44,7 +44,12 @@ def load_env_file(filepath=None):
 load_env_file()
 
 DB_PATH = os.path.join(BASE_DIR, "ewaste_system.db")
-DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
+raw_db_url = os.getenv("DATABASE_URL")
+if not raw_db_url or raw_db_url.startswith("sqlite:///.") or raw_db_url == "sqlite:///ewaste_system.db":
+    DATABASE_URL = f"sqlite:///{DB_PATH}"
+else:
+    DATABASE_URL = raw_db_url
+
 OPERATOR_SECRET_CODE = os.getenv("OPERATOR_SECRET_CODE", "SMKC-ADMIN")
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
@@ -344,6 +349,22 @@ def get_components(db: Session = Depends(get_db)):
         "data": [c.to_dict() for c in components]
     }
 
+@app.get("/api/components/{class_or_id}")
+def get_component_detail(class_or_id: str, db: Session = Depends(get_db)):
+    """Fetch detailed breakdown, sub-components, images, and recycling manual for a specific device."""
+    if class_or_id.isdigit():
+        comp = db.query(Component).filter(Component.component_id == int(class_or_id)).first()
+    else:
+        comp = db.query(Component).filter(Component.class_name == class_or_id.lower()).first()
+
+    if not comp:
+        raise HTTPException(status_code=404, detail=f"Component '{class_or_id}' not found in database.")
+
+    return {
+        "success": True,
+        "data": comp.to_dict()
+    }
+
 @app.get("/api/centers")
 def get_collection_centers(
     accepts_household: Optional[bool] = None,
@@ -586,4 +607,5 @@ def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
