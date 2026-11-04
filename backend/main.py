@@ -58,7 +58,17 @@ def get_db():
         db.close()
 
 # YOLOv8 Model Initialization
-MODEL_PATH = os.getenv("MODEL_PATH", os.path.join(BASE_DIR, "best.pt"))
+raw_model_path = os.getenv("MODEL_PATH", "best.pt")
+if not os.path.isabs(raw_model_path):
+    candidate_path = os.path.join(BASE_DIR, raw_model_path)
+    if os.path.exists(candidate_path):
+        MODEL_PATH = candidate_path
+    elif os.path.exists(raw_model_path):
+        MODEL_PATH = os.path.abspath(raw_model_path)
+    else:
+        MODEL_PATH = candidate_path
+else:
+    MODEL_PATH = raw_model_path
 yolo_model = None
 try:
     from ultralytics import YOLO
