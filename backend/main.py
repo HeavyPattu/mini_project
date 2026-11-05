@@ -161,20 +161,6 @@ def on_startup():
     seed_database()
     print("[SERVER STARTUP] Database seeded and initialized.")
 
-    # Execute YOLO warmup asynchronously in background thread so Uvicorn binds port instantly (< 0.2s)
-    def _async_warmup():
-        if yolo_model is not None:
-            try:
-                import torch
-                with torch.no_grad():
-                    dummy = Image.new("RGB", (64, 64), color=(0, 0, 0))
-                    yolo_model.predict(source=dummy, imgsz=64, device="cpu", verbose=False)
-                print("[YOLO WARMUP] Model weights warmed up in background thread.")
-            except Exception as e:
-                print(f"[YOLO WARMUP NOTICE] Background warmup skipped: {e}")
-
-    threading.Thread(target=_async_warmup, daemon=True).start()
-
 # ======================================================================
 # Pydantic Request Models
 # ======================================================================
@@ -282,9 +268,9 @@ def run_detection_pipeline(image: Image.Image, source: str, db: Session):
     # Perform YOLOv8 inference if model loaded
     if yolo_model is not None:
         try:
-            # Downsample to 320x320 for rapid CPU inference (< 40ms) on Render/Edge
+            # Downsample to 160x160 for rapid CPU inference (< 40ms) on Render/Edge
             infer_img = image.copy()
-            infer_img.thumbnail((320, 320))
+            infer_img.thumbnail((160, 160))
             infer_w, infer_h = infer_img.size
 
             import torch
@@ -292,7 +278,7 @@ def run_detection_pipeline(image: Image.Image, source: str, db: Session):
                 results = yolo_model.predict(
                     source=infer_img,
                     conf=0.15,
-                    imgsz=320,
+                    imgsz=160,
                     device="cpu",
                     verbose=False
                 )
@@ -410,6 +396,7 @@ def scan_ewaste_image(
         contents = file.file.read()
         print(f"[SCAN] Received multipart scan request: {len(contents)} bytes, source='{source}'")
         image = Image.open(io.BytesIO(contents)).convert("RGB")
+        image.thumbnail((800, 800))
     except Exception as e:
         print(f"[SCAN ERROR] Failed to read image: {e}")
         raise HTTPException(status_code=400, detail=f"Invalid image format: {str(e)}")
@@ -431,6 +418,7 @@ def scan_ewaste_image_json(
         img_bytes = base64.b64decode(raw_b64)
         print(f"[SCAN JSON] Received base64 scan: {len(img_bytes)} bytes, source='{req.source}'")
         image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        image.thumbnail((800, 800))
     except Exception as e:
         print(f"[SCAN JSON ERROR] Invalid base64 image: {e}")
         raise HTTPException(status_code=400, detail=f"Invalid base64 image payload: {str(e)}")
