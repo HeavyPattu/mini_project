@@ -13,6 +13,7 @@ import hashlib
 import base64
 import csv
 import gc
+import threading
 import concurrent.futures
 from datetime import datetime
 from typing import Optional, List
@@ -156,17 +157,23 @@ app.add_middleware(
 
 @app.on_event("startup")
 def on_startup():
-    # Ensure tables and initial seed data exist
+    # Ensure tables and initial seed data exist instantly
     seed_database()
-    if yolo_model is not None:
-        try:
-            import torch
-            with torch.no_grad():
-                dummy = Image.new("RGB", (64, 64), color=(0, 0, 0))
-                yolo_model.predict(source=dummy, imgsz=64, device="cpu", verbose=False)
-            print("[YOLO STARTUP] Model warmed up successfully.")
-        except Exception as e:
-            print(f"[YOLO STARTUP ERROR] Warmup skipped: {e}")
+    print("[SERVER STARTUP] Database seeded and initialized.")
+
+    # Execute YOLO warmup asynchronously in background thread so Uvicorn binds port instantly (< 0.2s)
+    def _async_warmup():
+        if yolo_model is not None:
+            try:
+                import torch
+                with torch.no_grad():
+                    dummy = Image.new("RGB", (64, 64), color=(0, 0, 0))
+                    yolo_model.predict(source=dummy, imgsz=64, device="cpu", verbose=False)
+                print("[YOLO WARMUP] Model weights warmed up in background thread.")
+            except Exception as e:
+                print(f"[YOLO WARMUP NOTICE] Background warmup skipped: {e}")
+
+    threading.Thread(target=_async_warmup, daemon=True).start()
 
 # ======================================================================
 # Pydantic Request Models

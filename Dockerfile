@@ -1,8 +1,7 @@
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PORT=8000
+    PYTHONUNBUFFERED=1
 
 # Install minimal OS libraries required for OpenCV headless and networking
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -24,7 +23,7 @@ COPY backend/ .
 # Run DB seeding on build so initial SQLite tables and components exist
 RUN python seed_db.py
 
-EXPOSE 8000
+EXPOSE 10000
 
-# Run FastAPI server
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Run FastAPI server binding to dynamic Render $PORT (fallback 10000)
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-10000}"]
