@@ -27,6 +27,7 @@ export default function DonorHomeScreen({ currentUser }) {
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState(null);
   const [activeHazardAlert, setActiveHazardAlert] = useState(false);
+  const [collectedBatch, setCollectedBatch] = useState([]);
 
   // Detail Modal State
   const [modalVisible, setModalVisible] = useState(false);
@@ -157,6 +158,25 @@ export default function DonorHomeScreen({ currentUser }) {
     }));
   };
 
+  const handleAddToBatch = () => {
+    if (!scanResult?.detections) return;
+    const newItems = scanResult.detections.map((d) => ({
+      item: d.class_name,
+      category: d.metadata?.category || 'E-Waste Item',
+      hazard: d.metadata?.hazard_level || 'Low',
+      qty: 1,
+    }));
+    setCollectedBatch((prev) => [...prev, ...newItems]);
+    setSelectedImage(null);
+    setScanResult(null);
+    setActiveHazardAlert(false);
+    Alert.alert('Item Added to Batch', 'Successfully added to your pickup collection. You can now scan your next e-waste item.');
+  };
+
+  const handleClearBatch = () => {
+    setCollectedBatch([]);
+  };
+
   const handleBookDoorstepPickup = async () => {
     if (!pickupDonorName || !pickupPhone || !pickupAddress) {
       Alert.alert('Missing Details', 'Please complete your name, phone, and Sangli pickup address.');
@@ -165,7 +185,7 @@ export default function DonorHomeScreen({ currentUser }) {
 
     setBookingLoading(true);
     try {
-      const itemsToBook = [];
+      const itemsToBook = [...collectedBatch];
       if (scanResult?.detections?.length > 0) {
         scanResult.detections.forEach((d) => {
           itemsToBook.push({
@@ -175,7 +195,8 @@ export default function DonorHomeScreen({ currentUser }) {
             qty: 1,
           });
         });
-      } else {
+      }
+      if (itemsToBook.length === 0) {
         itemsToBook.push({
           item: 'phone',
           category: 'Mobile Telecom',
@@ -198,6 +219,7 @@ export default function DonorHomeScreen({ currentUser }) {
       const result = await schedulePickup(payload);
       if (result.success) {
         setConfirmedTrackingCode(result.pickup.tracking_code);
+        setCollectedBatch([]);
       }
     } catch (err) {
       Alert.alert('Booking Error', err.response?.data?.detail || err.message || 'Could not schedule pickup.');
@@ -391,13 +413,60 @@ export default function DonorHomeScreen({ currentUser }) {
               </TouchableOpacity>
             ))}
 
+            {/* Multi-Item Batch Management */}
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 14, marginBottom: 8 }}>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: '#059669',
+                  paddingVertical: 12,
+                  paddingHorizontal: 14,
+                  borderRadius: 10,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onPress={handleAddToBatch}
+              >
+                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>
+                  ➕ Save & Scan Another Item
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Collected Batch Summary */}
+            {collectedBatch.length > 0 && (
+              <View
+                style={{
+                  backgroundColor: '#F0FDF4',
+                  borderWidth: 1,
+                  borderColor: '#86EFAC',
+                  borderRadius: 10,
+                  padding: 12,
+                  marginBottom: 10,
+                }}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontWeight: '700', color: '#166534', fontSize: 13 }}>
+                    📦 Pickup Batch: {collectedBatch.length} item{collectedBatch.length > 1 ? 's' : ''} saved
+                  </Text>
+                  <TouchableOpacity onPress={handleClearBatch}>
+                    <Text style={{ color: '#DC2626', fontSize: 12, fontWeight: '600' }}>Clear</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={{ color: '#15803D', fontSize: 12, marginTop: 4 }}>
+                  {collectedBatch.map((i) => i.item.toUpperCase()).join(' • ')}
+                </Text>
+              </View>
+            )}
+
             {/* Doorstep Pickup CTA Button */}
             <TouchableOpacity
               style={styles.schedulePickupBtn}
               onPress={() => setPickupModalVisible(true)}
             >
               <Text style={styles.schedulePickupBtnText}>
-                🚚 Schedule Doorstep Collection for Sangli-Miraj
+                🚚 Schedule Doorstep Collection ({collectedBatch.length + (scanResult?.detections?.length || 0)} Items)
               </Text>
             </TouchableOpacity>
           </View>

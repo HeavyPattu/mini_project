@@ -137,6 +137,12 @@ LABEL_MAPPING = {
     "earbuds": "earbud",
     "headphones": "earbud",
     "headphone": "earbud",
+    "microwave": "laptop",
+    "toaster": "pd",
+    "hair drier": "pd",
+    "clock": "pd",
+    "refrigerator": "laptop",
+    "oven": "laptop",
     "electronics": "pd",
 }
 
@@ -268,17 +274,17 @@ def run_detection_pipeline(image: Image.Image, source: str, db: Session):
     # Perform YOLOv8 inference if model loaded
     if yolo_model is not None:
         try:
-            # Downsample to 160x160 for rapid CPU inference (< 40ms) on Render/Edge
+            # Downsample to 320x320 for multi-object detection (< 0.3s CPU inference)
             infer_img = image.copy()
-            infer_img.thumbnail((160, 160))
+            infer_img.thumbnail((320, 320))
             infer_w, infer_h = infer_img.size
 
             import torch
             with torch.no_grad():
                 results = yolo_model.predict(
                     source=infer_img,
-                    conf=0.15,
-                    imgsz=160,
+                    conf=0.12,
+                    imgsz=320,
                     device="cpu",
                     verbose=False
                 )
