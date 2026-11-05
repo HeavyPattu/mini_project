@@ -34,7 +34,7 @@ let currentBaseUrl = DEFAULT_HOST;
 
 const api = axios.create({
   baseURL: currentBaseUrl,
-  timeout: 15000,
+  timeout: 45000,
   headers: {
     'Accept': 'application/json',
   },

@@ -287,21 +287,15 @@ def run_detection_pipeline(image: Image.Image, source: str, db: Session):
             infer_img.thumbnail((320, 320))
             infer_w, infer_h = infer_img.size
 
-            def _execute_yolo():
-                import torch
-                with torch.no_grad():
-                    return yolo_model.predict(
-                        source=infer_img,
-                        conf=0.15,
-                        imgsz=320,
-                        device="cpu",
-                        verbose=False
-                    )
-
-            # Strict 3.5s timeout prevents any container freeze or 502 Bad Gateway on low-CPU instances
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(_execute_yolo)
-                results = future.result(timeout=3.5)
+            import torch
+            with torch.no_grad():
+                results = yolo_model.predict(
+                    source=infer_img,
+                    conf=0.15,
+                    imgsz=320,
+                    device="cpu",
+                    verbose=False
+                )
 
             first_res = results[0]
             print(f"[YOLO] Raw boxes detected by YOLOv8: {len(first_res.boxes)}")
@@ -354,10 +348,8 @@ def run_detection_pipeline(image: Image.Image, source: str, db: Session):
                         })
             db.commit()
             del results, first_res
-        except concurrent.futures.TimeoutError:
-            print("[YOLO TIMEOUT] Inference exceeded 3.5s budget. Engaging deterministic failover.")
         except Exception as e:
-            print(f"[YOLO ERROR] {e}. Engaging deterministic failover.")
+            print(f"[YOLO INFERENCE ERROR] {e}. Falling back to default detection.")
         finally:
             gc.collect()
 
